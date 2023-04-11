@@ -1,0 +1,136 @@
+---
+- name: Install and configure remote logging on web
+  hosts: web
+  become: true
+  vars:
+    nginx_listen_port: 80
+  tasks:
+    - name: NGINX | Install EPEL Repo package from standart repo
+      yum:
+        name: epel-release
+        state: present
+      tags:
+        - epel-package
+        - packages
+    - name: Install nginx package from epel repo
+      yum:
+        name: nginx
+        state: latest
+      notify:
+        - restart nginx
+      tags:
+        - nginx-package
+        - packages
+    - name: NGINX | Create NGINX config from template
+      template:
+        src: templates/nginx.conf.j2
+        dest: /etc/nginx/nginx.conf
+      notify:
+        - reload nginx
+      tags:
+        -nginx-configuration
+    - name: Set local time
+      copy:
+        src: /usr/share/zoneinfo/Europe/Moscow
+        dest: /etc/localtime
+        remote_src: yes
+      notify:
+        - restart chronyd
+    - name: Configure rsyslog
+      copy:
+        src: files/rsyslog.conf
+        dest: /etc/rsyslog.conf
+      notify:
+        - restart rsyslog
+    - name: Configure auditd
+      copy:
+        src: files/audit.rules
+        dest: /etc/audit/rules.d/audit.rules
+      notify:
+        - restart auditd
+    - name: Install audispd-plugins package from epel repo
+      yum:
+        name: audispd-plugins
+        state: latest
+    - name: Configure auditd
+      copy:
+        src: files/auditd.conf
+        dest: /etc/audit/auditd.conf
+      notify:
+        - restart auditd
+    - name: Configure audisp
+      copy:
+        src: files/au-remote.conf
+        dest: /etc/audisp/plugins.d/au-remote.conf
+      notify:
+        - restart auditd
+    - name: Configure audisp 2
+      copy:
+        src: files/audisp-remote.conf
+        dest: /etc/audisp/audisp-remote.conf
+      notify:
+        - restart auditd    
+  handlers:
+    - name: restart nginx
+      systemd:
+        name: nginx
+        state: restarted
+        enabled: yes
+    - name: reload nginx
+      systemd:
+        name: nginx
+        state: reloaded
+    - name: restart chronyd
+      systemd:
+        name: chronyd
+        state: restarted
+    - name: restart rsyslog
+      systemd:
+        name: rsyslog
+        state: restarted
+    - name: restart auditd
+      command: /sbin/service auditd restart
+- name: Install and configure remote logging on log
+  hosts: log
+  become: true
+  tasks:
+    - name: Set local time
+      copy:
+        src: /usr/share/zoneinfo/Europe/Moscow
+        dest: /etc/localtime
+        remote_src: yes
+      notify:
+        - restart chronyd
+    - name: Configure rsyslog
+      copy:
+        src: files/rsyslog.conf
+        dest: /etc/rsyslog.conf
+      notify:
+        - restart rsyslog
+    - name: Configure auditd
+      copy:
+        src: files/auditd.conf
+        dest: /etc/audit/auditd.conf
+      notify:
+        - restart auditd
+  handlers:
+    - name: restart nginx
+      systemd:
+        name: nginx
+        state: restarted
+        enabled: yes
+    - name: reload nginx
+      systemd:
+        name: nginx
+        state: reloaded
+    - name: restart chronyd
+      systemd:
+        name: chronyd
+        state: restarted
+    - name: restart rsyslog
+      systemd:
+        name: rsyslog
+        state: restarted
+    - name: restart auditd
+      command: /sbin/service auditd restart
+
